@@ -5,9 +5,15 @@ import { AdvancedPredictionEngine } from "../core/advanced-engine";
 import { PoissonRegression } from "../models/poisson-regression";
 
 const getAI = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey || apiKey === "undefined") {
+    console.error("Clé API Gemini manquante. Configurez API_KEY dans vos variables d'environnement.");
+    return null;
+  }
   try {
-    return new GoogleGenAI({ apiKey: process.env.API_KEY });
+    return new GoogleGenAI({ apiKey });
   } catch (e) {
+    console.error("Erreur d'initialisation Gemini:", e);
     return null;
   }
 };
@@ -42,7 +48,7 @@ export const analyzeMatch = async (homeTeamName: string, awayTeamName: string): 
         .map((c: any) => ({ title: c.web?.title || "Source", uri: c.web?.uri || "" }))
         .filter((s: any) => s.uri !== "");
     } catch (e) {
-      console.warn("Grounding failed, using base stats.");
+      console.warn("Analyse IA indisponible, utilisation des statistiques de base.");
     }
   }
 
@@ -121,12 +127,13 @@ export const getTodaysMatches = async (): Promise<TodaysMatch[]> => {
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: "Liste les 30 matchs de foot du jour en JSON: [{home, away, competition, time, status, isLive}].",
+      contents: "Liste les 30 matchs de foot du jour en JSON: [{home, away, competition, time, status, isLive}]. Ne renvoie que le JSON.",
       config: { tools: [{ googleSearch: {} }] }
     });
     const jsonMatch = (response.text || "").match(/\[\s*\{[\s\S]*\}\s*\]/);
     return jsonMatch ? JSON.parse(jsonMatch[0]) : [];
   } catch (e) {
+    console.warn("Erreur récupération matchs du jour:", e);
     return [];
   }
 };
@@ -137,7 +144,7 @@ export const generateMatchPoster = async (home: string, away: string) => {
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
-      contents: `Cinematic pro football match poster ${home} vs ${away}, 8k.`,
+      contents: `Cinematic pro football match poster ${home} vs ${away}, 8k stadium lighting.`,
       config: { imageConfig: { aspectRatio: "16:9" } }
     });
     const parts = response.candidates?.[0]?.content?.parts || [];

@@ -36,20 +36,24 @@ const App: React.FC = () => {
   const [activeHour, setActiveHour] = useState<string>('TOUS');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Persistence: Load from localStorage
+  // Persistence: Load with safety check
   useEffect(() => {
     const savedResults = localStorage.getItem('footypredict_history');
     if (savedResults) {
       try {
-        setResults(JSON.parse(savedResults));
+        const parsed = JSON.parse(savedResults);
+        if (Array.isArray(parsed)) {
+          setResults(parsed);
+        }
       } catch (e) {
-        console.error("Erreur chargement historique", e);
+        console.error("Erreur historique localStorage:", e);
+        localStorage.removeItem('footypredict_history');
       }
     }
     handleDiscoverMatches();
   }, []);
 
-  // Persistence: Save to localStorage
+  // Persistence: Save
   useEffect(() => {
     if (results.length > 0) {
       localStorage.setItem('footypredict_history', JSON.stringify(results));
@@ -58,9 +62,14 @@ const App: React.FC = () => {
 
   const handleDiscoverMatches = async () => {
     setIsDiscovering(true);
-    const matches = await getTodaysMatches();
-    setTodaysMatches(matches);
-    setIsDiscovering(false);
+    try {
+      const matches = await getTodaysMatches();
+      setTodaysMatches(Array.isArray(matches) ? matches : []);
+    } catch (e) {
+      console.error("Erreur flux matchs:", e);
+    } finally {
+      setIsDiscovering(false);
+    }
   };
 
   const clearHistory = () => {
@@ -102,30 +111,31 @@ const App: React.FC = () => {
     setIsLoading(true);
     setProgress({ current: 0, total: validMatches.length });
 
-    const newResults: MatchResult[] = [];
-    for (let i = 0; i < validMatches.length; i++) {
-      const match = validMatches[i];
-      const analysis = await analyzeMatch(match.home, match.away);
-      const posterUrl = await generateMatchPoster(match.home, match.away);
-      newResults.push({ id: match.id, analysis, poster: posterUrl });
-      setProgress(prev => ({ ...prev, current: i + 1 }));
+    try {
+      const newResults: MatchResult[] = [];
+      for (let i = 0; i < validMatches.length; i++) {
+        const match = validMatches[i];
+        const analysis = await analyzeMatch(match.home, match.away);
+        const posterUrl = await generateMatchPoster(match.home, match.away);
+        newResults.push({ id: match.id, analysis, poster: posterUrl });
+        setProgress(prev => ({ ...prev, current: i + 1 }));
+      }
+      setResults(prev => [...newResults, ...prev]);
+      setMatchInputs([{ id: Math.random().toString(36).substr(2, 9), home: '', away: '' }]);
+    } catch (error) {
+      console.error("Erreur simulation:", error);
+      alert("Une erreur est survenue pendant la simulation. Vérifiez votre clé API.");
+    } finally {
+      setIsLoading(false);
     }
-
-    setResults(prev => [...newResults, ...prev]);
-    setIsLoading(false);
-    
-    // Clear inputs after success
-    setMatchInputs([{ id: Math.random().toString(36).substr(2, 9), home: '', away: '' }]);
   };
 
   const availableHours = useMemo(() => {
     const hoursSet = new Set<string>();
     todaysMatches.forEach(m => {
-      if (m.isLive) {
-        hoursSet.add("DIRECT");
-      } else if (m.status?.includes('TERMINE')) {
-        hoursSet.add("FIN");
-      } else {
+      if (m.isLive) hoursSet.add("DIRECT");
+      else if (m.status?.includes('TERMINE')) hoursSet.add("FIN");
+      else {
         const hour = m.time?.split(':')[0];
         if (hour) hoursSet.add(hour + 'h');
       }
@@ -149,6 +159,7 @@ const App: React.FC = () => {
   }, [todaysMatches, activeHour]);
 
   const filteredResults = useMemo(() => {
+    if (!Array.isArray(results)) return [];
     let filtered = [...results];
     if (activeFilter === 'high_win') filtered = filtered.filter(r => r.analysis.winProb >= 50);
     if (activeFilter === 'high_draw') filtered = filtered.filter(r => r.analysis.drawProb >= 35);
@@ -194,7 +205,6 @@ const App: React.FC = () => {
       </header>
 
       <div className="flex-1 flex overflow-hidden relative z-10">
-        
         <aside 
           className={`
             fixed lg:static inset-0 z-[100] lg:z-auto transition-all duration-500 ease-in-out flex
@@ -242,7 +252,7 @@ const App: React.FC = () => {
               <div className="flex-1 overflow-y-auto p-5 space-y-3.5 custom-scrollbar">
                 {isDiscovering ? (
                   Array(10).fill(0).map((_, i) => (
-                    <div key={i} className="h-28 bg-white/5 rounded-[2rem] animate-pulse" />
+                    <div key={i} className="h-28 bg-white/5 rounded-[2rem] animate-pulse mb-3" />
                   ))
                 ) : (
                   filteredMatchesByHour.length > 0 ? (
@@ -250,7 +260,7 @@ const App: React.FC = () => {
                       <button
                         key={idx}
                         onClick={() => quickAddMatch(m.home, m.away)}
-                        className="w-full text-left p-6 rounded-[2rem] bg-white/[0.03] border border-white/5 hover:bg-indigo-600/10 hover:border-indigo-500/50 transition-all group relative overflow-hidden"
+                        className="w-full text-left p-6 rounded-[2rem] bg-white/[0.03] border border-white/5 hover:bg-indigo-600/10 hover:border-indigo-500/50 transition-all group relative overflow-hidden mb-3"
                       >
                         <div className="flex justify-between items-center mb-4 relative z-10">
                           <span className="text-[9px] font-black text-slate-500 truncate max-w-[120px] uppercase tracking-[0.1em]">{m.competition}</span>
@@ -264,9 +274,6 @@ const App: React.FC = () => {
                         <div className="flex flex-col gap-1.5 relative z-10">
                           <span className="text-xs font-black text-slate-300 group-hover:text-emerald-400 transition-colors truncate">{m.home}</span>
                           <span className="text-xs font-black text-slate-300 group-hover:text-blue-400 transition-colors truncate">{m.away}</span>
-                        </div>
-                        <div className="absolute right-5 bottom-6 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
-                          <Plus size={20} className="text-indigo-500" />
                         </div>
                       </button>
                     ))
@@ -295,10 +302,7 @@ const App: React.FC = () => {
 
         <main className="flex-1 overflow-y-auto p-6 md:p-14 custom-scrollbar relative">
           <div className="max-w-5xl mx-auto space-y-20">
-            
             <div className="bg-slate-900/40 rounded-[3.5rem] border border-white/5 overflow-hidden shadow-2xl backdrop-blur-3xl relative">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 blur-[100px] rounded-full pointer-events-none" />
-              
               <div className="bg-gradient-to-br from-indigo-600/10 via-transparent to-transparent p-10 md:p-16">
                 <div className="flex flex-col items-center text-center mb-16">
                   <div className="inline-flex items-center gap-3 px-5 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-[11px] font-black uppercase text-indigo-400 tracking-[0.2em] mb-8 shadow-inner">
@@ -307,110 +311,62 @@ const App: React.FC = () => {
                   <h2 className="text-5xl md:text-7xl font-black heading-font tracking-tighter uppercase mb-8 leading-tight">
                     DEEP <span className="text-indigo-500 italic">ANALYSIS</span>
                   </h2>
-                  <p className="text-slate-500 text-[12px] md:text-sm font-black uppercase tracking-[0.4em] max-w-xl mx-auto leading-relaxed opacity-60">
-                    Modélisation SVD & Régressions de Poisson Itératives
-                  </p>
                 </div>
 
                 <form onSubmit={handleDiagnose} className="space-y-10">
-                  <div className="space-y-5 max-h-[450px] overflow-y-auto pr-6 custom-scrollbar px-2">
+                  <div className="space-y-5 max-h-[450px] overflow-y-auto pr-2 custom-scrollbar">
                     {matchInputs.map((match, index) => (
-                      <div key={match.id} className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center group animate-in slide-in-from-left-8 duration-600">
+                      <div key={match.id} className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center group">
                         <div className="md:col-span-1 flex justify-center text-[13px] font-black text-slate-800 italic uppercase">#{index + 1}</div>
-                        
-                        <div className="md:col-span-5 relative group/input">
+                        <div className="md:col-span-5">
                           <input
                             type="text" placeholder="ÉQUIPE DOMICILE" value={match.home}
                             onChange={(e) => updateMatchInput(match.id, 'home', e.target.value)}
-                            className="w-full bg-slate-950/60 border border-white/5 rounded-[2rem] py-6 px-8 pl-16 focus:border-emerald-500/50 focus:bg-emerald-500/10 focus:outline-none transition-all text-sm font-black uppercase tracking-widest placeholder:text-slate-800 shadow-inner"
+                            className="w-full bg-slate-950/60 border border-white/5 rounded-[2rem] py-6 px-8 focus:border-emerald-500/50 transition-all text-sm font-black uppercase tracking-widest placeholder:text-slate-800"
                           />
-                          <Activity className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-800 group-focus-within/input:text-emerald-500 transition-colors" size={24} />
                         </div>
-
-                        <div className="md:col-span-5 relative group/input">
+                        <div className="md:col-span-5">
                           <input
                             type="text" placeholder="ÉQUIPE EXTÉRIEUR" value={match.away}
                             onChange={(e) => updateMatchInput(match.id, 'away', e.target.value)}
-                            className="w-full bg-slate-950/60 border border-white/5 rounded-[2rem] py-6 px-8 pl-16 focus:border-blue-500/50 focus:bg-blue-500/10 focus:outline-none transition-all text-sm font-black uppercase tracking-widest placeholder:text-slate-800 shadow-inner"
+                            className="w-full bg-slate-950/60 border border-white/5 rounded-[2rem] py-6 px-8 focus:border-blue-500/50 transition-all text-sm font-black uppercase tracking-widest placeholder:text-slate-800"
                           />
-                          <Target className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-800 group-focus-within/input:text-blue-500 transition-colors" size={24} />
                         </div>
-
                         <div className="md:col-span-1 flex justify-center">
-                          <button 
-                            type="button" 
-                            onClick={() => removeMatchRow(match.id)} 
-                            disabled={matchInputs.length === 1} 
-                            className="p-5 bg-red-500/5 text-red-500/20 hover:text-red-500 hover:bg-red-500/20 transition-all rounded-[1.5rem] active:scale-90 disabled:opacity-0"
-                          >
-                            <Trash2 size={24} />
-                          </button>
+                          <button type="button" onClick={() => removeMatchRow(match.id)} disabled={matchInputs.length === 1} className="p-5 text-red-500/20 hover:text-red-500 transition-all"><Trash2 size={24} /></button>
                         </div>
                       </div>
                     ))}
                   </div>
-
                   <div className="flex flex-col md:flex-row items-center justify-between gap-10 pt-12 border-t border-white/5">
-                    <button 
-                      type="button" 
-                      onClick={addMatchRow} 
-                      className="flex items-center space-x-4 text-white bg-slate-800/50 hover:bg-slate-700 px-10 py-5 rounded-[1.8rem] text-xs font-black uppercase tracking-[0.2em] transition-all active:scale-95 border border-white/5"
-                    >
-                      <Plus size={20} /> <span>Ajouter Scénario</span>
+                    <button type="button" onClick={addMatchRow} className="flex items-center space-x-4 text-white bg-slate-800/50 px-10 py-5 rounded-[1.8rem] text-xs font-black uppercase tracking-[0.2em]">
+                      <Plus size={20} /> <span>Ajouter</span>
                     </button>
-                    <button 
-                      type="submit" 
-                      disabled={isLoading} 
-                      className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-black py-6 px-20 rounded-[1.8rem] transition-all shadow-2xl shadow-indigo-600/50 flex items-center justify-center space-x-6 uppercase text-[15px] tracking-[0.3em] active:scale-95 disabled:bg-slate-800 disabled:shadow-none"
-                    >
-                      {isLoading ? (
-                        <><Loader2 className="animate-spin" size={24} /><span>SIMULATION {progress.current}/{progress.total}</span></>
-                      ) : (
-                        <><Zap size={24} /><span>Lancer Diagnostic</span></>
-                      )}
+                    <button type="submit" disabled={isLoading} className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-black py-6 px-20 rounded-[1.8rem] shadow-2xl flex items-center justify-center space-x-6 uppercase text-[15px] tracking-[0.3em]">
+                      {isLoading ? <Loader2 className="animate-spin" size={24} /> : <Zap size={24} />}
+                      <span>Lancer Diagnostic</span>
                     </button>
                   </div>
                 </form>
               </div>
             </div>
 
-            {results.length > 0 && (
+            {filteredResults.length > 0 && (
               <div className="space-y-12 pb-48">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 bg-slate-900/80 backdrop-blur-3xl p-8 rounded-[3rem] border border-white/10 sticky top-28 z-40 shadow-2xl">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 bg-slate-900/80 backdrop-blur-3xl p-8 rounded-[3rem] border border-white/10 sticky top-24 z-40 shadow-2xl">
                   <div className="flex items-center space-x-6 px-4">
-                    <div className="p-4 bg-indigo-600 rounded-[1.5rem] shadow-xl shadow-indigo-600/30">
+                    <div className="p-4 bg-indigo-600 rounded-[1.5rem]">
                       <LayoutGrid size={26} className="text-white" />
                     </div>
-                    <div>
-                      <h3 className="text-lg font-black uppercase tracking-widest">Matrice de Résultats</h3>
-                      <div className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.2em]">{results.length} Simulations Validées</div>
-                    </div>
+                    <h3 className="text-lg font-black uppercase tracking-widest">Matrice de Résultats</h3>
                   </div>
-                  
-                  <div className="flex flex-wrap items-center gap-3 p-2 bg-black/40 rounded-[1.8rem] border border-white/5">
-                    {[
-                      {id:'all', label:'Rapport Global'},
-                      {id:'high_win', label:'Picks Domicile'},
-                      {id:'high_draw', label:'Zones de Nul'}
-                    ].map(f => (
-                      <button 
-                        key={f.id} 
-                        onClick={() => setActiveFilter(f.id as FilterType)} 
-                        className={`px-8 py-4 rounded-[1.4rem] text-[10px] font-black uppercase tracking-[0.2em] transition-all ${activeFilter === f.id ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/30' : 'text-slate-500 hover:text-slate-300'}`}
-                      >
-                        {f.label}
-                      </button>
-                    ))}
-                    <button 
-                      onClick={clearHistory}
-                      className="ml-auto px-6 py-4 rounded-[1.4rem] text-[10px] font-black uppercase tracking-[0.2em] text-red-500 hover:bg-red-500/10 transition-all flex items-center gap-2"
-                    >
-                      <Eraser size={14} /> Effacer Historique
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button onClick={clearHistory} className="px-6 py-4 rounded-[1.4rem] text-[10px] font-black uppercase tracking-[0.2em] text-red-500 hover:bg-red-500/10 transition-all flex items-center gap-2">
+                      <Eraser size={14} /> Effacer
                     </button>
                   </div>
                 </div>
-
-                <div className="space-y-12 animate-in fade-in slide-in-from-bottom-16 duration-1000">
+                <div className="space-y-12">
                   {filteredResults.map(res => (
                     <MatchDisplay key={res.id} data={res.analysis} posterUrl={res.poster} />
                   ))}
@@ -420,32 +376,6 @@ const App: React.FC = () => {
           </div>
         </main>
       </div>
-
-      <button
-        onClick={() => setIsSidebarOpen(true)}
-        className="fixed bottom-10 right-10 z-[70] lg:hidden p-7 bg-indigo-600 text-white rounded-[2.5rem] shadow-2xl shadow-indigo-600/60 active:scale-90 transition-transform flex items-center justify-center hover:bg-indigo-500"
-      >
-        <Hash size={32} />
-        <div className="absolute -top-2 -right-2 bg-red-500 text-[11px] font-black w-8 h-8 rounded-full flex items-center justify-center border-4 border-[#020617] shadow-xl">
-          {todaysMatches.length}
-        </div>
-      </button>
-
-      <footer className="relative z-50 p-12 border-t border-white/5 text-center text-slate-800 text-[11px] uppercase tracking-[0.5em] font-black bg-[#020617]">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-10">
-          <p>© 2025 FOOTYPREDICT ASE ENGINE • ASE CORE v5.5 • DEEP SVD PIPELINE</p>
-          <div className="flex gap-12">
-            <span className="flex items-center gap-3">
-              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_12px_#10b981]" /> 
-              NETWORK: STABLE
-            </span>
-            <span className="flex items-center gap-3">
-              <div className="w-2.5 h-2.5 rounded-full bg-indigo-600 shadow-[0_0_12px_#4f46e5]" /> 
-              ENGINE: POISSON v5.5
-            </span>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 };
