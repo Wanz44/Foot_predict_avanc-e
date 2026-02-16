@@ -1,0 +1,5 @@
+{
+  "name": "FootyPredict Avancée",
+  "description": "Advanced football match diagnostic tool using real-time player form, injury reports, and statistical modeling to calculate victory probabilities.",
+  "requestFramePermissions": []
+}
