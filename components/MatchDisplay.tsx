@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { PredictionResult } from '../types';
 import { 
-  Zap, ChevronDown, ChevronUp, Activity, Target, Shield, Flame, Sparkles, Clock, Cpu, BarChart3, Sword, Crosshair, TrendingUp, Dumbbell, Trophy, PieChart as PieIcon, Search, Globe, LineChart as LineIcon, Layers, BoxSelect, AlertTriangle, Fingerprint, BrainCircuit, Waves, Timer, Dna, Banknote, Scale
+  Zap, ChevronDown, ChevronUp, Activity, Target, Shield, Flame, Sparkles, Clock, Cpu, BarChart3, Sword, Crosshair, TrendingUp, Dumbbell, Trophy, PieChart as PieIcon, Search, Globe, LineChart as LineIcon, Layers, BoxSelect, AlertTriangle, Fingerprint, BrainCircuit, Waves, Timer, Dna, Banknote, Scale, Percent
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, RadarChart, PolarGrid, PolarAngleAxis, Radar, LineChart, Line, XAxis, YAxis, CartesianGrid, AreaChart, Area, BarChart, Bar } from 'recharts';
 
@@ -17,7 +17,7 @@ const SectorGauge: React.FC<{ label: string; value: number; color: string; icon:
       <span className="flex items-center gap-1.5">{icon} {label}</span>
       <span style={{ color: color }}>{Math.round(value)}%</span>
     </div>
-    <div className="h-1.5 bg-slate-800/80 rounded-full overflow-hidden border border-white/5">
+    <div className="h-1 bg-slate-800/80 rounded-full overflow-hidden border border-white/5">
       <div className="h-full transition-all duration-1000" style={{ width: `${Math.min(value, 100)}%`, backgroundColor: color }} />
     </div>
   </div>
@@ -28,12 +28,6 @@ const MatchDisplay: React.FC<Props> = ({ data, posterUrl }) => {
   const HOME_COLOR = '#10b981'; 
   const AWAY_COLOR = '#3b82f6'; 
   const DRAW_COLOR = '#64748b'; 
-
-  const chartData = [
-    { name: 'DOM', value: data.winProb, color: HOME_COLOR },
-    { name: 'NUL', value: data.drawProb, color: DRAW_COLOR },
-    { name: 'EXT', value: data.lossProb, color: AWAY_COLOR },
-  ];
 
   const ensembleData = [
     { name: 'Poisson', weight: data.ensembleMetrics.poissonWeight * 100, color: '#f59e0b' },
@@ -49,6 +43,12 @@ const MatchDisplay: React.FC<Props> = ({ data, posterUrl }) => {
     { subject: 'Ensemble', A: data.ensembleMetrics.modelConvergence * 100, B: data.ensembleMetrics.modelConvergence * 95, fullMark: 100 },
   ];
 
+  const gaConvergenceData = data.geneticMetrics?.home.convergence.map((val, i) => ({
+    gen: i + 1,
+    home: val,
+    away: data.geneticMetrics?.away.convergence[i] || val
+  }));
+
   const timeSeriesData = data.timeSeriesAnalytics?.home.decomposition.trend.map((val, i) => ({
     name: `M${i+1}`,
     trend: val,
@@ -57,140 +57,158 @@ const MatchDisplay: React.FC<Props> = ({ data, posterUrl }) => {
   }));
 
   return (
-    <div className="relative bg-slate-900/60 border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl transition-all hover:border-indigo-500/30 group animate-in fade-in zoom-in-95 duration-700">
+    <div className="relative bg-slate-900/40 border border-white/5 rounded-[2rem] overflow-hidden shadow-xl transition-all hover:border-indigo-500/20 group animate-in fade-in zoom-in-95 duration-500">
       
-      <div className="absolute top-0 right-0 px-5 py-2 text-[8px] font-black uppercase tracking-[0.2em] rounded-bl-3xl z-10 flex items-center gap-3 bg-indigo-600/10 text-indigo-400 border-l border-b border-white/10 backdrop-blur-xl">
-        <Dna size={12} className="animate-spin duration-[4000ms]" />
-        ASE CORE v5.5 • ENSEMBLE LEARNING PIPELINE
+      {/* Barre de statut supérieure ultra-compacte */}
+      <div className="flex items-center justify-between px-6 py-2 bg-slate-950/40 border-b border-white/5">
+        <div className="flex items-center gap-3">
+          <Dna size={12} className="text-indigo-500 animate-spin duration-[5000ms]" />
+          <span className="text-[8px] font-black uppercase tracking-[0.3em] text-slate-500">ASE v5.5 • Hybrid Intelligence</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5">
+            <Percent size={10} className="text-indigo-400" />
+            <span className="text-[10px] font-black text-indigo-400 italic">CONFIANCE: {data.confidenceIndex}%</span>
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-12 items-center gap-8 p-8 md:p-12">
-        <div className="md:col-span-3 space-y-10">
-          <div className="space-y-4">
-            <h3 className="text-base font-black uppercase tracking-tighter truncate" style={{ color: HOME_COLOR }}>{data.homeTeam.name}</h3>
-            <div className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-2">
-              <Scale size={12} className="text-emerald-500" />
-              Weight: {Math.round(data.ensembleMetrics.monteCarloWeight * 100)}%
-            </div>
-            <div className="flex gap-1.5">
-              {Array.from({length: 8}).map((_, i) => (
-                <div key={i} className={`flex-1 h-1.5 rounded-full ${i < 6 ? 'bg-emerald-500/40' : 'bg-slate-800'}`} />
-              ))}
-            </div>
-          </div>
-          <div className="space-y-4">
-            <h3 className="text-base font-black uppercase tracking-tighter truncate" style={{ color: AWAY_COLOR }}>{data.awayTeam.name}</h3>
-            <div className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-2">
-               <Scale size={12} className="text-blue-500" />
-               Weight: {Math.round(data.ensembleMetrics.monteCarloWeight * 100)}%
-            </div>
-            <div className="flex gap-1.5">
-              {Array.from({length: 8}).map((_, i) => (
-                <div key={i} className={`flex-1 h-1.5 rounded-full ${i < 4 ? 'bg-blue-500/40' : 'bg-slate-800'}`} />
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="md:col-span-4 flex flex-col items-center justify-center py-6">
-          <div className="w-full h-[180px] relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={chartData} innerRadius={55} outerRadius={75} paddingAngle={8} dataKey="value" stroke="none">
-                  {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                </Pie>
-                <Tooltip contentStyle={{ backgroundColor: '#020617', border: 'none', borderRadius: '16px', fontSize: '11px', fontWeight: 'bold' }} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-[9px] font-black text-slate-500 tracking-widest uppercase text-center">Ensemble<br/>Agg.</span>
-              <span className="text-xl font-black text-white italic">{data.confidenceIndex}%</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="md:col-span-5 space-y-4">
-          <div className="bg-slate-950/60 p-6 rounded-[2rem] border border-white/5 flex items-center justify-between shadow-inner">
-            <div className="space-y-1.5">
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 text-indigo-400">
-                <Banknote size={14} /> Fair Odds Calculation
-              </span>
-              <div className="text-3xl font-black italic tracking-tighter text-white">
-                {(100 / data.winProb).toFixed(2)} <span className="text-slate-800 px-2">|</span> 1/P
+      <div className="p-6 md:p-8">
+        {/* Ligne Principale: Équipes et Score */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+          
+          <div className="md:col-span-4 flex items-center justify-between gap-4">
+            <div className="flex-1 text-right">
+              <h3 className="text-sm md:text-lg font-black uppercase tracking-tighter truncate text-slate-200">{data.homeTeam.name}</h3>
+              <div className="text-[9px] font-bold text-slate-500 uppercase flex items-center justify-end gap-1.5">
+                xG: {data.expectedGoals.home.toFixed(2)} <Target size={10} className="text-emerald-500" />
               </div>
             </div>
-            <div className="bg-white/5 p-3 rounded-2xl">
-              <TrendingUp size={20} className="text-emerald-500" />
+            <div className="w-10 h-10 rounded-2xl bg-slate-800/50 flex items-center justify-center border border-white/5 text-[10px] font-black text-slate-400">
+              DOM
             </div>
           </div>
 
-          <div className="bg-indigo-600 p-6 rounded-[2rem] border border-white/10 flex items-center justify-between shadow-2xl shadow-indigo-600/30 group/score transition-all hover:scale-[1.03] active:scale-95">
-            <div className="space-y-1.5">
-              <span className="text-[10px] font-black text-indigo-100/60 uppercase tracking-widest flex items-center gap-2">
-                <Sparkles size={14} /> Score Probable (Ensemble)
-              </span>
-              <div className="text-4xl font-black text-white italic tracking-tighter">{data.exactScore}</div>
+          <div className="md:col-span-4 flex flex-col items-center justify-center gap-3">
+            <div className="bg-indigo-600 px-8 py-3 rounded-2xl shadow-lg shadow-indigo-600/20 border border-white/10 group-hover:scale-105 transition-transform duration-500">
+              <div className="text-3xl font-black text-white italic tracking-tighter leading-none">{data.exactScore}</div>
             </div>
-            <div className="bg-white/10 p-4 rounded-3xl backdrop-blur-md">
-              <Trophy size={28} className="text-white" />
+            <div className="text-[8px] font-black text-slate-600 uppercase tracking-[0.2em]">Score Probable</div>
+          </div>
+
+          <div className="md:col-span-4 flex items-center justify-between gap-4">
+            <div className="w-10 h-10 rounded-2xl bg-slate-800/50 flex items-center justify-center border border-white/5 text-[10px] font-black text-slate-400">
+              EXT
+            </div>
+            <div className="flex-1 text-left">
+              <h3 className="text-sm md:text-lg font-black uppercase tracking-tighter truncate text-slate-200">{data.awayTeam.name}</h3>
+              <div className="text-[9px] font-bold text-slate-500 uppercase flex items-center justify-start gap-1.5">
+                <Target size={10} className="text-blue-500" /> xG: {data.expectedGoals.away.toFixed(2)}
+              </div>
             </div>
           </div>
         </div>
+
+        {/* Barre de Probabilité 1X2 Compacte */}
+        <div className="mt-8 space-y-2">
+          <div className="flex h-2.5 rounded-full overflow-hidden border border-white/5 shadow-inner bg-slate-950">
+            <div className="h-full transition-all duration-1000 relative group/prob" style={{ width: `${data.winProb}%`, backgroundColor: HOME_COLOR }}>
+              <div className="absolute inset-0 bg-white/10 opacity-0 group-hover/prob:opacity-100 transition-opacity" />
+            </div>
+            <div className="h-full transition-all duration-1000 relative group/prob" style={{ width: `${data.drawProb}%`, backgroundColor: DRAW_COLOR }}>
+              <div className="absolute inset-0 bg-white/10 opacity-0 group-hover/prob:opacity-100 transition-opacity" />
+            </div>
+            <div className="h-full transition-all duration-1000 relative group/prob" style={{ width: `${data.lossProb}%`, backgroundColor: AWAY_COLOR }}>
+              <div className="absolute inset-0 bg-white/10 opacity-0 group-hover/prob:opacity-100 transition-opacity" />
+            </div>
+          </div>
+          <div className="flex justify-between px-1">
+            <div className="flex flex-col">
+              <span className="text-[9px] font-black text-emerald-500 uppercase">1 (H): {data.winProb}%</span>
+              <span className="text-[8px] font-bold text-slate-600 italic">Cote: {(100/data.winProb).toFixed(2)}</span>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-[9px] font-black text-slate-500 uppercase">X (N): {data.drawProb}%</span>
+              <span className="text-[8px] font-bold text-slate-600 italic">Cote: {(100/data.drawProb).toFixed(2)}</span>
+            </div>
+            <div className="flex flex-col items-end">
+              <span className="text-[9px] font-black text-blue-500 uppercase">2 (A): {data.lossProb}%</span>
+              <span className="text-[8px] font-bold text-slate-600 italic">Cote: {(100/data.lossProb).toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Métriques Flash */}
+        <div className="mt-6 flex items-center justify-between gap-4 pt-6 border-t border-white/5">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <BrainCircuit size={14} className="text-indigo-500" />
+              <div className="flex flex-col">
+                <span className="text-[8px] font-black text-slate-600 uppercase">Entropy</span>
+                <span className="text-[10px] font-black text-slate-300 italic">{data.bayesianMetrics?.entropy.toFixed(3)}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Timer size={14} className="text-amber-500" />
+              <div className="flex flex-col">
+                <span className="text-[8px] font-black text-slate-600 uppercase">GARCH Vol.</span>
+                <span className="text-[10px] font-black text-slate-300 italic">{data.timeSeriesAnalytics?.home.volatility.var95.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+          
+          <button 
+            onClick={() => setIsExpanded(!isExpanded)} 
+            className="flex items-center gap-3 px-6 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 transition-all group"
+          >
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:text-white">Détails Expert</span>
+            {isExpanded ? <ChevronUp size={16} className="text-indigo-500" /> : <ChevronDown size={16} className="text-indigo-500" />}
+          </button>
+        </div>
       </div>
 
-      <button 
-        onClick={() => setIsExpanded(!isExpanded)} 
-        className="w-full py-5 bg-white/[0.02] hover:bg-indigo-500/5 border-t border-white/5 flex items-center justify-center space-x-4 text-[11px] font-black uppercase tracking-[0.3em] text-slate-500 transition-all"
-      >
-        <Dna size={16} className="text-indigo-500" />
-        <span>Accéder au Rapport de Diagnostic Pro</span>
-        {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-      </button>
-
       {isExpanded && (
-        <div className="p-10 md:p-14 bg-slate-950/90 border-t border-white/5 animate-in slide-in-from-top-6 duration-700">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
+        <div className="p-8 md:p-12 bg-slate-950/90 border-t border-white/5 animate-in slide-in-from-top-6 duration-700">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
             
-            <div className="space-y-12">
-              <div className="bg-slate-900/40 p-10 rounded-[3rem] border border-white/5 space-y-10 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-[60px] rounded-full" />
-                <h4 className="text-xs font-black uppercase tracking-widest text-indigo-400 mb-2 flex items-center gap-3">
-                  <Layers size={16} /> Matrice d'Agrégation des Modèles
+            <div className="space-y-10">
+              <div className="bg-slate-900/40 p-8 rounded-[2.5rem] border border-white/5 space-y-8 relative overflow-hidden">
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-2 flex items-center gap-3">
+                  <Layers size={14} /> Profil Tactique Holistique
                 </h4>
                 
                 <div className="h-[200px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={ensembleData} layout="vertical" margin={{ left: -20 }}>
-                      <XAxis type="number" hide />
-                      <YAxis dataKey="name" type="category" tick={{ fill: '#475569', fontSize: 10, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
-                      <Bar dataKey="weight" radius={[0, 10, 10, 0]} barSize={20}>
-                        {ensembleData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                      </Bar>
-                    </BarChart>
+                    <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
+                      <PolarGrid stroke="#1e293b" />
+                      <PolarAngleAxis dataKey="subject" tick={{ fill: '#475569', fontSize: 9, fontWeight: 'bold' }} />
+                      <Radar name={data.homeTeam.name} dataKey="A" stroke={HOME_COLOR} fill={HOME_COLOR} fillOpacity={0.3} />
+                      <Radar name={data.awayTeam.name} dataKey="B" stroke={AWAY_COLOR} fill={AWAY_COLOR} fillOpacity={0.3} />
+                    </RadarChart>
                   </ResponsiveContainer>
                 </div>
 
-                <div className="grid grid-cols-2 gap-8">
-                  <SectorGauge label="Convergence" value={data.ensembleMetrics.modelConvergence * 100} color={HOME_COLOR} icon={<Activity size={14} />} />
-                  <SectorGauge label="Entropy H(x)" value={(1 - data.bayesianMetrics?.entropy! / 1.58) * 100} color="#f59e0b" icon={<Waves size={14} />} />
+                <div className="grid grid-cols-2 gap-6">
+                  <SectorGauge label="Bayes Conf." value={(data.bayesianMetrics?.inferenceConfidence || 0) * 100} color={HOME_COLOR} icon={<BrainCircuit size={12} />} />
+                  <SectorGauge label="MC Weight" value={data.ensembleMetrics.monteCarloWeight * 100} color="#f59e0b" icon={<Activity size={12} />} />
                 </div>
               </div>
 
               {data.valueBets.length > 0 && (
-                <div className="bg-emerald-600/10 p-10 rounded-[3rem] border border-emerald-500/20 space-y-8">
-                   <h4 className="text-xs font-black uppercase tracking-widest text-emerald-400 mb-2 flex items-center gap-3">
-                     <Banknote size={16} /> Opportunités "Value Bets" Identifiées
+                <div className="bg-emerald-600/5 p-8 rounded-[2.5rem] border border-emerald-500/10 space-y-6">
+                   <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-400 mb-2 flex items-center gap-3">
+                     <Banknote size={14} /> Opportunités Value Bets
                    </h4>
-                   <div className="space-y-4">
+                   <div className="space-y-3">
                      {data.valueBets.map((bet, i) => (
-                       <div key={i} className="flex items-center justify-between p-6 bg-emerald-500/5 border border-emerald-500/10 rounded-3xl group/bet transition-all hover:bg-emerald-500/10">
+                       <div key={i} className="flex items-center justify-between p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl">
                          <div>
-                            <div className="text-[9px] font-black text-emerald-500/60 uppercase tracking-widest mb-1">{bet.type}</div>
-                            <div className="text-lg font-black text-white italic">Edge: +{bet.edge}%</div>
+                            <div className="text-[8px] font-black text-emerald-500/60 uppercase mb-1">{bet.type}</div>
+                            <div className="text-sm font-black text-white italic">+{bet.edge}% Advantage</div>
                          </div>
                          <div className="text-right">
-                            <div className="text-[10px] font-bold text-slate-500 uppercase">Market: {bet.marketOdds}</div>
-                            <div className="text-[10px] font-bold text-emerald-400 uppercase">Fair: {bet.fairOdds}</div>
+                            <div className="text-[9px] font-bold text-slate-500 uppercase">Market: {bet.marketOdds}</div>
+                            <div className="text-[9px] font-bold text-emerald-400 uppercase">Fair: {bet.fairOdds}</div>
                          </div>
                        </div>
                      ))}
@@ -199,42 +217,40 @@ const MatchDisplay: React.FC<Props> = ({ data, posterUrl }) => {
               )}
             </div>
 
-            <div className="space-y-12">
-              <div className="bg-slate-900/40 p-10 rounded-[3rem] border border-white/5 space-y-10 relative overflow-hidden">
-                 <h4 className="text-xs font-black uppercase tracking-widest text-indigo-400 mb-2 flex items-center gap-3">
-                   <Target size={16} /> Top 5 des Scores les plus Probables
+            <div className="space-y-10">
+              <div className="bg-slate-900/40 p-8 rounded-[2.5rem] border border-white/5 space-y-6">
+                 <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-2 flex items-center gap-3">
+                   <Target size={14} /> Top 5 Scores (Poisson Distribution)
                  </h4>
-                 <div className="space-y-4">
+                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3">
                     {data.topScores.map((score, i) => (
-                      <div key={i} className="flex items-center justify-between p-5 bg-white/[0.02] border border-white/5 rounded-3xl hover:bg-white/[0.05] transition-all">
-                        <div className="flex items-center gap-5">
-                          <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-black text-slate-500">{i+1}</div>
-                          <span className="text-2xl font-black italic tracking-tighter text-white">{score.score}</span>
+                      <div key={i} className="flex items-center justify-between p-4 bg-white/[0.02] border border-white/5 rounded-2xl">
+                        <div className="flex items-center gap-4">
+                          <div className="w-6 h-6 rounded-lg bg-slate-800 flex items-center justify-center text-[8px] font-black text-slate-500">{i+1}</div>
+                          <span className="text-lg font-black italic tracking-tighter text-white">{score.score}</span>
                         </div>
-                        <span className="text-sm font-black text-indigo-400 italic">{score.prob.toFixed(2)}%</span>
+                        <span className="text-xs font-black text-indigo-400 italic">{score.prob.toFixed(1)}%</span>
                       </div>
                     ))}
                  </div>
               </div>
 
-              <div className="bg-gradient-to-br from-indigo-500/10 via-transparent to-transparent p-10 rounded-[3rem] border border-indigo-500/20 relative shadow-2xl">
-                 <div className="flex items-center gap-4 mb-8">
-                   <div className="p-3 bg-indigo-600 rounded-2xl">
-                     <Fingerprint size={20} className="text-white" />
-                   </div>
-                   <span className="text-[11px] font-black uppercase text-indigo-400 tracking-widest">Ensemble Learning Diagnostics</span>
+              <div className="bg-gradient-to-br from-indigo-500/10 to-transparent p-8 rounded-[2.5rem] border border-indigo-500/20 shadow-2xl">
+                 <div className="flex items-center gap-3 mb-6">
+                   <Fingerprint size={16} className="text-indigo-400" />
+                   <span className="text-[9px] font-black uppercase text-indigo-400 tracking-widest">Diagnostic Pipeline ASE v5.5</span>
                  </div>
-                 <p className="text-base md:text-lg text-slate-200 leading-relaxed italic font-medium mb-10">
+                 <p className="text-xs md:text-sm text-slate-300 leading-relaxed italic font-medium mb-8">
                    "{data.reasoning}"
                  </p>
-                 <div className="pt-8 border-t border-white/5 grid grid-cols-2 gap-8">
+                 <div className="pt-6 border-t border-white/5 grid grid-cols-2 gap-6">
                     <div>
-                      <div className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-2">Simulations MC</div>
-                      <div className="text-2xl font-black text-white italic">100,000 IT.</div>
+                      <div className="text-[8px] font-black text-slate-600 uppercase tracking-widest mb-1">Convergence</div>
+                      <div className="text-lg font-black text-emerald-500 italic">{Math.round(data.ensembleMetrics.modelConvergence * 100)}%</div>
                     </div>
                     <div>
-                      <div className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-2">Confidence Index</div>
-                      <div className="text-2xl font-black text-indigo-500 italic">{data.confidenceIndex}%</div>
+                      <div className="text-[8px] font-black text-slate-600 uppercase tracking-widest mb-1">Volatilité VaR</div>
+                      <div className="text-lg font-black text-amber-500 italic">σ={data.timeSeriesAnalytics?.home.volatility.var95.toFixed(2)}</div>
                     </div>
                  </div>
               </div>
