@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { PredictionResult } from '../types';
 import { 
-  Zap, ChevronDown, ChevronUp, Activity, Target, Shield, Flame, Sparkles, Clock, Cpu, BarChart3, Sword, Crosshair, TrendingUp, Dumbbell, Trophy, PieChart as PieIcon, Search, Globe, LineChart as LineIcon, Layers, BoxSelect, AlertTriangle, Fingerprint, BrainCircuit, Waves, Timer, Dna, Banknote, Scale, Percent
+  Zap, ChevronDown, ChevronUp, Activity, Target, Shield, Flame, Sparkles, Clock, Cpu, BarChart3, Sword, Crosshair, TrendingUp, Dumbbell, Trophy, PieChart as PieIcon, Search, Globe, LineChart as LineIcon, Layers, BoxSelect, AlertTriangle, Fingerprint, BrainCircuit, Waves, Timer, Dna, Banknote, Scale, Percent, Share2, Check
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, RadarChart, PolarGrid, PolarAngleAxis, Radar, LineChart, Line, XAxis, YAxis, CartesianGrid, AreaChart, Area, BarChart, Bar } from 'recharts';
 
@@ -25,15 +25,11 @@ const SectorGauge: React.FC<{ label: string; value: number; color: string; icon:
 
 const MatchDisplay: React.FC<Props> = ({ data, posterUrl }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+  
   const HOME_COLOR = '#10b981'; 
   const AWAY_COLOR = '#3b82f6'; 
   const DRAW_COLOR = '#64748b'; 
-
-  const ensembleData = [
-    { name: 'Poisson', weight: data.ensembleMetrics.poissonWeight * 100, color: '#f59e0b' },
-    { name: 'M. Carlo', weight: data.ensembleMetrics.monteCarloWeight * 100, color: '#8b5cf6' },
-    { name: 'Bayes', weight: data.ensembleMetrics.bayesianWeight * 100, color: '#ec4899' },
-  ];
 
   const radarData = [
     { subject: 'Attaque', A: data.homeTeam.attackPower, B: data.awayTeam.attackPower, fullMark: 100 },
@@ -43,18 +39,12 @@ const MatchDisplay: React.FC<Props> = ({ data, posterUrl }) => {
     { subject: 'Ensemble', A: data.ensembleMetrics.modelConvergence * 100, B: data.ensembleMetrics.modelConvergence * 95, fullMark: 100 },
   ];
 
-  const gaConvergenceData = data.geneticMetrics?.home.convergence.map((val, i) => ({
-    gen: i + 1,
-    home: val,
-    away: data.geneticMetrics?.away.convergence[i] || val
-  }));
-
-  const timeSeriesData = data.timeSeriesAnalytics?.home.decomposition.trend.map((val, i) => ({
-    name: `M${i+1}`,
-    trend: val,
-    seasonal: data.timeSeriesAnalytics?.home.decomposition.seasonal[i] || 0,
-    residual: data.timeSeriesAnalytics?.home.decomposition.residual[i] || 0
-  }));
+  const copySummary = () => {
+    const summary = `⚽ FootyPredict AI (ASE v5.5)\n${data.homeTeam.name} vs ${data.awayTeam.name}\n🎯 Score Probable: ${data.exactScore}\n🎲 Probabilités: 1: ${data.winProb}% | N: ${data.drawProb}% | 2: ${data.lossProb}%\n📈 xG: ${data.expectedGoals.home.toFixed(2)} - ${data.expectedGoals.away.toFixed(2)}\n💎 Confidence: ${data.confidenceIndex}%`;
+    navigator.clipboard.writeText(summary);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
 
   return (
     <div className="relative bg-slate-900/40 border border-white/5 rounded-[2rem] overflow-hidden shadow-xl transition-all hover:border-indigo-500/20 group animate-in fade-in zoom-in-95 duration-500">
@@ -66,7 +56,14 @@ const MatchDisplay: React.FC<Props> = ({ data, posterUrl }) => {
           <span className="text-[8px] font-black uppercase tracking-[0.3em] text-slate-500">ASE v5.5 • Hybrid Intelligence</span>
         </div>
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5">
+          <button 
+            onClick={copySummary}
+            className={`flex items-center gap-1.5 transition-all px-2 py-0.5 rounded-lg ${isCopied ? 'text-emerald-400 bg-emerald-400/10' : 'text-slate-500 hover:text-white'}`}
+          >
+            {isCopied ? <Check size={10} /> : <Share2 size={10} />}
+            <span className="text-[9px] font-black uppercase tracking-widest">{isCopied ? 'COPIÉ !' : 'PARTAGER'}</span>
+          </button>
+          <div className="flex items-center gap-1.5 border-l border-white/10 pl-4">
             <Percent size={10} className="text-indigo-400" />
             <span className="text-[10px] font-black text-indigo-400 italic">CONFIANCE: {data.confidenceIndex}%</span>
           </div>

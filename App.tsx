@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Search, Loader2, Trophy, ArrowRight, Plus, Trash2, LayoutGrid, Filter, TrendingUp, 
   Equal, ChevronDown, Activity, Calendar, Sparkles, Cpu, RefreshCw, Clock, 
-  ChevronRight, ShieldCheck, Menu, X, Hash, Target, Zap 
+  ChevronRight, ShieldCheck, Menu, X, Hash, Target, Zap, Eraser 
 } from 'lucide-react';
 import { analyzeMatch, generateMatchPoster, getTodaysMatches } from './services/geminiService';
 import { PredictionResult, TodaysMatch } from './types';
@@ -36,15 +36,38 @@ const App: React.FC = () => {
   const [activeHour, setActiveHour] = useState<string>('TOUS');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // Persistence: Load from localStorage
   useEffect(() => {
+    const savedResults = localStorage.getItem('footypredict_history');
+    if (savedResults) {
+      try {
+        setResults(JSON.parse(savedResults));
+      } catch (e) {
+        console.error("Erreur chargement historique", e);
+      }
+    }
     handleDiscoverMatches();
   }, []);
+
+  // Persistence: Save to localStorage
+  useEffect(() => {
+    if (results.length > 0) {
+      localStorage.setItem('footypredict_history', JSON.stringify(results));
+    }
+  }, [results]);
 
   const handleDiscoverMatches = async () => {
     setIsDiscovering(true);
     const matches = await getTodaysMatches();
     setTodaysMatches(matches);
     setIsDiscovering(false);
+  };
+
+  const clearHistory = () => {
+    if (window.confirm("Effacer tout l'historique des simulations ?")) {
+      setResults([]);
+      localStorage.removeItem('footypredict_history');
+    }
   };
 
   const addMatchRow = () => {
@@ -77,7 +100,6 @@ const App: React.FC = () => {
     if (validMatches.length === 0) return;
 
     setIsLoading(true);
-    setResults([]);
     setProgress({ current: 0, total: validMatches.length });
 
     const newResults: MatchResult[] = [];
@@ -89,8 +111,11 @@ const App: React.FC = () => {
       setProgress(prev => ({ ...prev, current: i + 1 }));
     }
 
-    setResults(newResults);
+    setResults(prev => [...newResults, ...prev]);
     setIsLoading(false);
+    
+    // Clear inputs after success
+    setMatchInputs([{ id: Math.random().toString(36).substr(2, 9), home: '', away: '' }]);
   };
 
   const availableHours = useMemo(() => {
@@ -362,7 +387,7 @@ const App: React.FC = () => {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-3 p-2 bg-black/40 rounded-[1.8rem] border border-white/5">
+                  <div className="flex flex-wrap items-center gap-3 p-2 bg-black/40 rounded-[1.8rem] border border-white/5">
                     {[
                       {id:'all', label:'Rapport Global'},
                       {id:'high_win', label:'Picks Domicile'},
@@ -376,6 +401,12 @@ const App: React.FC = () => {
                         {f.label}
                       </button>
                     ))}
+                    <button 
+                      onClick={clearHistory}
+                      className="ml-auto px-6 py-4 rounded-[1.4rem] text-[10px] font-black uppercase tracking-[0.2em] text-red-500 hover:bg-red-500/10 transition-all flex items-center gap-2"
+                    >
+                      <Eraser size={14} /> Effacer Historique
+                    </button>
                   </div>
                 </div>
 
